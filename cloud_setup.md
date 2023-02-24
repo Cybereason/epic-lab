@@ -84,7 +84,7 @@ GCP_ZONE=$zone
 # warning: don't change the base url - it currently MUST be at the base of the scripture bucket in a 'synccode' folder
 SYNCCODE_GCS_BASE_URL=gs://$bucket/synccode
 SYNCCODE_USERNAME=$your_username
-SYNCCODE_LOCAL_CODE_BASE=~/work
+SYNCCODE_LOCAL_CODE_BASE=~/code
 SYNCCODE_REPOS=my-project,my-other-project
 # SYNCCODE_EXCLUSION=... (optional - override default exclusion)
 EOF
