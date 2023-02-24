@@ -1,0 +1,194 @@
+#!/bin/bash
+set -u
+set -e
+
+EPIC_LAB_CONFIG=${EPIC_LAB_CONFIG:-"$HOME/.epic/lab"}
+SYNCCODE_VM_CONFIGURATION=${SYNCCODE_VM_CONFIGURATION:-"$HOME/synccode/_config"}
+python=${PYTHON_EXECUTABLE:-python}
+
+# exclusion expressions must use [/\\] as path separator to support both POSIX and Windows clients
+DEFAULT_EXCLUSION='((.*[/\\])?(\.git|\.idea|\.vs|__pycache__|vendored|\.serverless|build|dist|[^/\\]+\.egg-info)[/\\].*)'
+DEFAULT_EXCLUSION="$DEFAULT_EXCLUSION"'|(.*\.(pyo|pyc|so|o|a)$)'
+DEFAULT_EXCLUSION="$DEFAULT_EXCLUSION"'|((.*[/\\])?\.DS_Store$)'
+
+_load_config() {
+  config_file="${1:-$EPIC_LAB_CONFIG}"
+  if [[ ! -e "$config_file" ]]; then
+    echo "ERROR: configuration not found at $config_file"
+    exit 1
+  fi
+  # load and verify
+  source "$config_file"
+  export SYNCCODE_EXCLUSION="${SYNCCODE_EXCLUSION:-$DEFAULT_EXCLUSION}"
+  if [[ -z "${SYNCCODE_GCS_BASE_URL:-}" ]]; then
+    echo "error: please configure SYNCCODE_GCS_BASE_URL in '$EPIC_LAB_CONFIG' to your GCS synccode base url"
+    exit 1
+  fi
+  if [[ -z "${SYNCCODE_USERNAME:-}" ]]; then
+    echo "error: please configure SYNCCODE_USERNAME in '$EPIC_LAB_CONFIG' to your lab username"
+    exit 1
+  fi
+  if [[ -z "${SYNCCODE_REPOS:-}" ]]; then
+    echo "error: please configure SYNCCODE_REPOS in '$EPIC_LAB_CONFIG' to a comma separated list of repo names to upload"
+    exit 1
+  fi
+  if [[ -z "${SYNCCODE_LOCAL_CODE_BASE}" ]]; then
+    echo "error: please configure SYNCCODE_LOCAL_CODE_BASE in '$EPIC_LAB_CONFIG' to your local repos parent directory"
+    exit 1
+  fi
+}
+
+_load_vm_configuration() {
+  if [[ ! -e "$SYNCCODE_VM_CONFIGURATION" ]]; then
+    echo "*** WARNING: this command should only be used on the cloud VM machine ***"
+    echo "ERROR: synccode VM configuration not found at $SYNCCODE_VM_CONFIGURATION"
+    exit 1
+  fi
+  source "$SYNCCODE_VM_CONFIGURATION"
+  dummy="$bucket"
+  dummy="$prefix"
+  unset dummy
+}
+
+synccode_upload() {
+  _load_config
+
+  # repos to sync
+  repos_to_sync=${1:-$SYNCCODE_REPOS}
+  echo "Repos to be synced: ${repos_to_sync}"
+
+  # upload configuration for cloud reference
+  gsutil cp "$EPIC_LAB_CONFIG" "${SYNCCODE_GCS_BASE_URL}/${SYNCCODE_USERNAME}/_config" 2>&1 | grep -v issue33725
+
+  # upload each repo
+  IFS=',' read -ra arr_repos <<< "$repos_to_sync"
+  for repo in "${arr_repos[@]}"; do
+    synccode_upload_repo "$repo"
+  done
+}
+
+synccode_upload_repo() {
+  _load_config
+  repo="$1"
+  echo "=== synccode: uploading ${SYNCCODE_USERNAME}'s repo $repo ==="
+  exclusion="_synccode_marker|(${SYNCCODE_EXCLUSION})|$(_compile_synccodeignore "${SYNCCODE_LOCAL_CODE_BASE}/${repo}/.synccodeignore")"
+  # upload changes
+  gsutil -m rsync \
+    -r -d -J \
+    -x "$exclusion" \
+    "${SYNCCODE_LOCAL_CODE_BASE}/${repo}" \
+    "${SYNCCODE_GCS_BASE_URL}/${SYNCCODE_USERNAME}/${repo}" \
+    2>&1 \
+  | grep -v issue33725
+  # apply synccode marker
+  date \
+    | gsutil cp - \
+      "${SYNCCODE_GCS_BASE_URL}/${SYNCCODE_USERNAME}/${repo}/_synccode_marker" \
+    > /dev/null 2>&1
+}
+
+synccode_download_repo() {
+  _load_vm_configuration
+  _load_config "$HOME/synccode/_uploader_config"
+  if [[ "${SYNCCODE_GCS_BASE_URL}" != "gs://${bucket}/${prefix}" ]]; then
+    echo "error: mismatch between uploader SYNCCODE_GCS_BASE_URL (${SYNCCODE_GCS_BASE_URL}) and cloud vm configuration bucket/prefix (gs://${bucket}/${prefix})"
+    exit 1
+  fi
+  username="$1"
+  repo="$2"
+  target_folder="$3"
+  echo "=== synccode: downloading ${username}'s repo $repo to $target_folder ==="
+  mkdir -p "$target_folder"
+  exclusion="(${SYNCCODE_EXCLUSION})|$(_compile_synccodeignore "${target_folder}/.synccodeignore")"
+  gsutil -m rsync -r -d -J -x "$exclusion" "${SYNCCODE_GCS_BASE_URL}/${username}/${repo}" "${target_folder}"
+}
+
+synccode_download() {
+  # we run python code that in turn runs a different function from this bash script. how lovely!
+  "$python" -c 'import epic.lab.synccode; epic.lab.synccode.SyncCodeDownloadMonitor().check_for_updates()'
+}
+
+# if .synccodeignore exists in the repo root, it should include regex lines according to gsutil rsync specification
+_compile_synccodeignore() {
+  path="$1"
+  if ! test -e "$path"; then
+    # this should never match
+    echo '($nosynccodeignore)'
+  else
+    # compress synccodeignore nonempty lines into a single line with parentheses and pipes
+    cat "$path" | "$python" -c 'import sys; print("(" + ")|(".join(filter(bool, map(str.strip, sys.stdin.readlines()))) + ")")'
+  fi
+}
+
+synccode_delete_repo() {
+  _load_config
+  repo="$1"
+  echo "=== synccode: deleting ${SYNCCODE_USERNAME}'s repo $repo ==="
+  gsutil -m rm "${SYNCCODE_GCS_BASE_URL}/${SYNCCODE_USERNAME}/${repo}" \
+    2>&1 \
+  | grep -v issue33725
+  echo "=== synccode: repo $repo deleted, remember to manually remove any VM downloaded copies ==="
+}
+
+synccode_configure_vm() {
+  bucket="$1"
+  prefix="$2"
+  mkdir -p "$HOME/synccode"
+  cat << END > "$SYNCCODE_VM_CONFIGURATION"
+bucket=$bucket
+prefix=$prefix
+END
+}
+
+usage() {
+  cat <<-EOF
+Usage:
+  epic-synccode <command> <args...>
+
+  available commands:
+    upload:
+      - epic-synccode upload [repo1,repo2,repo3]
+      - run this on a local dev machine to upload the relevant repositories into the cloud
+      - if repos are not specified, all the repos configured in SYNCCODE_REPOS will be uploaded
+    download:
+      - epic-synccode download
+      - run this on your cloud notebook instance to download your latest uploaded code into ~/synccode
+    delete:
+      - epic-synccode delete repo
+      - run this on a local dev machine to delete the cloud copy of the repo
+      - after the cloud copy is deleted, you'll need to manually remove any VM downloaded copies
+
+  configuration:
+    configure the following in '$EPIC_LAB_CONFIG':
+    - SYNCCODE_GCS_BASE_URL: your GCS synccode base url (note: has to be gs://<gcs_scripture_bucket>/synccode)
+    - SYNCCODE_USERNAME: use the same username you used for cloud VM name prefix (e.g. gooduser)
+    - SYNCCODE_LOCAL_CODE_BASE: the path for your local repos parent directory (e.g. ~/code)
+    - SYNCCODE_REPOS: a comma-separated list of repo names to upload (e.g. repo1,repo2)
+    - SYNCCODE_EXCLUSION: optional, override default file pattern exclusion
+EOF
+}
+
+cmd="${1:-help}"
+if [[ "$cmd" == 'upload' ]] || [[ "$cmd" == 'up' ]]; then
+  shift
+  synccode_upload "$@"
+elif [[ "$cmd" == 'download' ]] || [[ "$cmd" == 'dn' ]]; then
+  shift
+  synccode_download "$@"
+elif [[ "$cmd" == 'download-repo' ]]; then
+  shift
+  synccode_download_repo "$@"
+elif [[ "$cmd" == 'delete' ]]; then
+  shift
+  synccode_delete_repo "$@"
+elif [[ "$cmd" == 'configure-vm' ]]; then
+  shift
+  synccode_configure_vm "$@"
+elif [[ "$cmd" == 'help' ]] || [[ "$cmd" == '--help' ]]; then
+  usage
+else
+  echo "unknown command: $cmd"
+  echo
+  usage
+  exit 1
+fi

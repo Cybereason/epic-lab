@@ -1,0 +1,163 @@
+#!/bin/bash
+set -u
+set -e
+
+EPIC_LAB_CONFIG=${EPIC_LAB_CONFIG:-"$HOME/.epic/lab"}
+
+_load_config() {
+  if [[ ! -e "$EPIC_LAB_CONFIG" ]]; then
+    echo "ERROR: configuration not found at $EPIC_LAB_CONFIG"
+    exit 1
+  fi
+  # load and verify
+  source "$EPIC_LAB_CONFIG"
+  dummy="$GCP_PROJECT_ID"
+  dummy="$GCP_GCS_SCRIPTURE_BASE_PATH"
+  dummy="$GCP_ZONE"
+  unset dummy
+}
+
+notebook_launch() {
+  _load_config
+  instance_name="$1"
+  machine_type="${2:-n2-standard-4}"
+  disk_size="${3:-200}"
+  spot_mode="${4:-nospot}"
+  shift || true
+  shift || true
+  shift || true
+  shift || true
+  if [[ "$spot_mode" == "spot" ]]; then
+    spot_dependent_params="--maintenance-policy=TERMINATE --provisioning-model=SPOT"
+  elif [[ "$spot_mode" == "nospot" ]]; then
+    spot_dependent_params="--maintenance-policy=MIGRATE"
+  else
+    echo "ERROR: invalid value for spot mode: $spot_mode"
+    exit 1
+  fi
+  gcloud beta \
+    --project "$GCP_PROJECT_ID" \
+    compute instances create "$instance_name" \
+      --machine-type "$machine_type" \
+      --zone "$GCP_ZONE" \
+      --create-disk "device-name=$instance_name,size=$disk_size,image-project=ubuntu-os-cloud,image-family=ubuntu-2004-lts,auto-delete=yes,boot=yes,mode=rw,type=projects/$GCP_PROJECT_ID/zones/$GCP_ZONE/diskTypes/pd-balanced" \
+      --tags=epic-lab,epic-lab-notebooks \
+      --metadata=block-project-ssh-keys=true,startup-script=export\ gs_base_path="${GCP_GCS_SCRIPTURE_BASE_PATH}"$'\n'gsutil\ cat\ \"\$gs_base_path/on_create.sh\"\ \|\ bash\ - \
+      --network-interface=network-tier=PREMIUM,subnet=default \
+      $spot_dependent_params \
+      --scopes=https://www.googleapis.com/auth/cloud-platform \
+      --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring \
+      --reservation-affinity=any \
+      "$@"
+}
+
+notebook_suspend() {
+  _load_config
+  instance_name="$1"
+  gcloud \
+    --project "$GCP_PROJECT_ID" \
+    beta compute instances suspend "$instance_name" \
+      --zone "$GCP_ZONE"
+}
+
+notebook_resume() {
+  _load_config
+  instance_name="$1"
+  gcloud \
+    --project "$GCP_PROJECT_ID" \
+    beta compute instances resume "$instance_name" \
+      --zone "$GCP_ZONE"
+}
+
+notebook_terminate() {
+  _load_config
+  instance_name="$1"
+  gcloud \
+    --project "$GCP_PROJECT_ID" \
+    compute instances delete "$instance_name" \
+      --zone "$GCP_ZONE"
+}
+
+# undocumented, since not everyone has permissions to use it
+notebook_ssh() {
+  _load_config
+  instance_name="$1"
+  shift
+  gcloud \
+    --project "$GCP_PROJECT_ID" \
+    compute ssh \
+      --tunnel-through-iap \
+      --zone "$GCP_ZONE" \
+      "$instance_name" \
+      "$@"
+}
+
+notebook_logs() {
+  _load_config
+  instance_name="$1"
+  shift
+  gcloud compute \
+    --project "$GCP_PROJECT_ID" \
+    instances get-serial-port-output "$instance_name" \
+      --zone "$GCP_ZONE" \
+      --port=1 \
+      "$@"
+}
+
+usage() {
+  cat <<-EOF
+Usage:
+  epic-notebook <command> <args...>
+
+  available commands:
+    launch:
+      - epic-notebook launch <instance_name> [machine_type=n2-standard-4] [disk_size=200] [spot_mode=nospot]
+      - the instance name should be your synccode username followed by an optional dash-continuation (e.g. gooduser-123)
+    suspend:
+      - epic-notebook suspend <instance_name>
+      - the instance will "close its lid", save its memory, and you'll keep paying for storage alone
+    resume:
+      - epic-notebook resume <instance_name>
+      - the opposite of suspend
+    terminate:
+      - epic-notebook terminate <instance_name>
+      - terminate the instance
+    logs:
+      - epic-notebook logs <instance_name> [--start=...]
+      - get serial port 1 (AKA console) output
+    ssh:
+      - epic-notebook ssh <instance_name> [-- <ssh-flags>]
+      - use IAP to ssh into the instance directly while bypassing network configuration
+      - this requires specific roles assigned to the user - see README.md for details
+EOF
+}
+
+test_it() {
+  _load_config
+
+}
+
+cmd="${1:-help}"
+shift || true
+if [[ "$cmd" == 'launch' ]]; then
+  notebook_launch "$@"
+elif [[ "$cmd" == 'suspend' ]]; then
+  notebook_suspend "$@"
+elif [[ "$cmd" == 'resume' ]]; then
+  notebook_resume "$@"
+elif [[ "$cmd" == 'terminate' ]]; then
+  notebook_terminate "$@"
+elif [[ "$cmd" == 'ssh' ]]; then
+  notebook_ssh "$@"
+elif [[ "$cmd" == "log" ]] || [[ "$cmd" == "logs" ]]; then
+  notebook_logs "$@"
+elif [[ "$cmd" == 'help' ]] || [[ "$cmd" == '--help' ]]; then
+  usage
+elif [[ "$cmd" == 'test' ]]; then
+  test_it
+else
+  echo "unknown command: $cmd"
+  echo
+  usage
+  exit 1
+fi
