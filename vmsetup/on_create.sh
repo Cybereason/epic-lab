@@ -161,7 +161,9 @@ user_file_exists conda/bin/jupyter || run_as_user <<END
     epic-common \
     epic-logging \
     epic-caching \
-    epic-jupyter
+    epic-serialize \
+    epic-jupyter \
+    epic-pandas
 
   # note: if you fork this library, and modify the python packages, adjust this command to install your code
   $USER_HOME/conda/bin/pip install -U --extra-index-url https://d2dsindf03djlb.cloudfront.net \
