@@ -163,7 +163,8 @@ user_file_exists conda/bin/jupyter || run_as_user <<END
     epic-caching \
     epic-serialize \
     epic-jupyter \
-    epic-pandas
+    epic-pandas \
+    ultima
 
   # note: if you fork this library, and modify the python packages, adjust this command to install your code
   $USER_HOME/conda/bin/pip install -U --extra-index-url https://d2dsindf03djlb.cloudfront.net \
@@ -303,7 +304,7 @@ END
       ln -s ~/configuration/$username/gitconfig ~/.gitconfig
     fi
     if (test -e ~/configuration/$username/jupyterlab-settings); then
-      jpl_settings_path="$(jupyter lab path | grep -Po '(?<=User Settings directory: )(.*)')"
+      jpl_settings_path="$(~/conda/bin/jupyter lab path | grep -Po '(?<=User Settings directory: )(.*)')"
       mkdir -p "${jpl_settings_path}/@jupyterlab"
       cp -r ~/configuration/$username/jupyterlab-settings/* "${jpl_settings_path}/@jupyterlab/"
     fi
