@@ -50,7 +50,7 @@ class SyncCodeDownloadMonitor:
             print(f"warning: no repos found for user {self.user}, upload some or restart this kernel")
             return
         while True:
-            # download the latest config for scripture reference
+            # download the latest config for scripts reference
             config_text = self._get_config_text()
             open(os.path.join(self.local_target_path, "_uploader_config"), "w").write(config_text)
             # note: this can be parallelized

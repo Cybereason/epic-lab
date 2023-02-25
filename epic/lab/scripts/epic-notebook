@@ -12,7 +12,7 @@ _load_config() {
   # load and verify
   source "$EPIC_LAB_CONFIG"
   dummy="$GCP_PROJECT_ID"
-  dummy="$GCP_GCS_SCRIPTURE_BASE_PATH"
+  dummy="$GCP_GCS_SCRIPTS_BASE_PATH"
   dummy="$GCP_ZONE"
   unset dummy
 }
@@ -42,7 +42,7 @@ notebook_launch() {
       --zone "$GCP_ZONE" \
       --create-disk "device-name=$instance_name,size=$disk_size,image-project=ubuntu-os-cloud,image-family=ubuntu-2004-lts,auto-delete=yes,boot=yes,mode=rw,type=projects/$GCP_PROJECT_ID/zones/$GCP_ZONE/diskTypes/pd-balanced" \
       --tags=epic-lab,epic-lab-notebooks \
-      --metadata=block-project-ssh-keys=true,startup-script=export\ gs_base_path="${GCP_GCS_SCRIPTURE_BASE_PATH}"$'\n'gsutil\ cat\ \"\$gs_base_path/on_create.sh\"\ \|\ bash\ - \
+      --metadata=block-project-ssh-keys=true,startup-script=export\ gs_base_path="${GCP_GCS_SCRIPTS_BASE_PATH}"$'\n'gsutil\ cat\ \"\$gs_base_path/on_create.sh\"\ \|\ bash\ - \
       --network-interface=network-tier=PREMIUM,subnet=default \
       $spot_dependent_params \
       --scopes=https://www.googleapis.com/auth/cloud-platform \
@@ -129,13 +129,12 @@ Usage:
       - epic-notebook ssh <instance_name> [-- <ssh-flags>]
       - use IAP to ssh into the instance directly while bypassing network configuration
       - this requires specific roles assigned to the user - see README.md for details
+
+  Configuration is loaded from "\$HOME/.epic/lab" by default.
+  Override it by setting the EPIC_LAB_CONFIG environment variable to a different path.
 EOF
 }
 
-test_it() {
-  _load_config
-
-}
 
 cmd="${1:-help}"
 shift || true
@@ -153,8 +152,6 @@ elif [[ "$cmd" == "log" ]] || [[ "$cmd" == "logs" ]]; then
   notebook_logs "$@"
 elif [[ "$cmd" == 'help' ]] || [[ "$cmd" == '--help' ]]; then
   usage
-elif [[ "$cmd" == 'test' ]]; then
-  test_it
 else
   echo "unknown command: $cmd"
   echo

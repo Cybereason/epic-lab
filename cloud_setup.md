@@ -15,7 +15,9 @@ The three parts are:
 The following is a run through of the steps you'll need to run. Use it as a base template and adapt for your specific
 needs. It is recommended to run the commands one by one and review each command's output for potential errors.
 
-Run the following in the root folder of the `epic-lab` repository:
+First, clone this repository.
+
+Then, run the following commands in its root folder:
 
 ```shell
 # basic configuration - replace with your choice of values
@@ -27,8 +29,6 @@ your_username="gooduser"
 # override these if you don't like the default
 bucket="$project_id"
 ssh_key_name="$project_id"
-# it's a good practice to keep VM setup scripture versioned and allow existing users to upgrade when they're ready
-vm_setup_version="vmsetup_$(date +%Y%m%d)"
 
 project_number=$(gcloud projects list --filter="$project_id" --format="value(PROJECT_NUMBER)")
 default_service_account="${project_number}-compute@developer.gserviceaccount.com"
@@ -63,13 +63,39 @@ gcloud --project "$project_id" secrets versions add epic-lab-ssh-key-public --da
 gcloud --project "$project_id" secrets create --replication-policy="automatic" epic-lab-jupyter-password
 gcloud --project "$project_id" secrets versions add epic-lab-jupyter-password --data-file="$jupyter_password_hash_file"
 
-# create bucket and upload scripture
-gcloud --project "$project_id" storage buckets create "gs://$bucket"
-gcloud --project "$project_id" storage cp ../vmsetup/** "gs://$bucket/$vm_setup_version"
-
 # create gcp repos
 gcloud --project "$project_id" source repos create notebooks
 gcloud --project "$project_id" source repos create configuration
+
+# create bucket for scripts and synccode
+gcloud --project "$project_id" storage buckets create "gs://$bucket"
+```
+
+We now have all the core cloud resources we need for our environment.
+
+Next, we'll create a versioned VM setup deployment. We will:
+1. Upload the core VM setup scripts to a folder with our version name
+2. Create a config file to reflect its parameters
+3. Optionally, upload externally provided additional setup scripts
+
+This part can be repeated whenever a new modified version of the setup scripts needs to be deployed. Old versions can
+continue to be used as long as the user configuration keeps reflecting the older version. Cloud VMs are not upgradeable. 
+
+Run these commands in continuation to the previous section (i.e. with the same environment variables):
+
+```shell
+# this will be the version of our deployed VM setup scripts
+vm_setup_version="vmsetup_$(date +%Y%m%d)"
+
+# upload core VM setup scripts
+gcloud --project "$project_id" storage cp vmsetup/** "gs://$bucket/$vm_setup_version"
+
+# OPTIONAL: you can upload additional scripts to further setup your VM beyond the standard epic-lab scripts.
+# A file named "additional_on_create.sh" is executed once when the machine has completed its initial setup.
+# Other files can be uploaded to the folder as well, and used by the "additional_on_create" script.
+# for example:
+test -f additional_on_create.sh && \
+  gcloud --project "$project_id" storage cp additional_on_create.sh "gs://$bucket/$vm_setup_version/"
 
 # prepare config
 # note: change values here as relevant
@@ -77,18 +103,27 @@ mkdir -p ~/.epic
 cat << EOF > ~/.epic/lab
 # general configuration
 GCP_PROJECT_ID=$project_id
-GCP_GCS_SCRIPTURE_BASE_PATH=gs://$bucket/$vm_setup_version
+GCP_GCS_SCRIPTS_BASE_PATH=gs://$bucket/$vm_setup_version
 GCP_ZONE=$zone
 
 # synccode
-# warning: don't change the base url - it currently MUST be at the base of the scripture bucket in a 'synccode' folder
+# warning: don't change the base url - it currently MUST be at the base of the scripts bucket in a 'synccode' folder
 SYNCCODE_GCS_BASE_URL=gs://$bucket/synccode
 SYNCCODE_USERNAME=$your_username
 SYNCCODE_LOCAL_CODE_BASE=~/code
 SYNCCODE_REPOS=my-project,my-other-project
 # SYNCCODE_EXCLUSION=... (optional - override default exclusion)
 EOF
+```
 
+The setup is ready to start working, and your local machine is configured to work with it.
+
+The next step is to launch the first VM instance.
+This can be done now on any local machine and for any user, as long as they have the proper configuration.
+
+For the sake of example, we'll continue to launch for the same user we've run from until now.
+
+```shell
 # launch your first machine
 # note: if you didn't `pip install` the epic-lab library, you can still run the scripts directly from 'epic/lab/scripts'
 notebook_instance_name="$your_username-$(date +%Y%m%d)"
@@ -274,7 +309,7 @@ epic_lab_proxy_oauth_client_secret=$(gcloud --project=$project_id iap oauth-clie
 epic_lab_proxy_oauth_client_id=$(gcloud --project=$project_id iap oauth-clients list "$epic_lab_proxy_brand" \
   --filter="displayName=epic-lab-proxy" \
   --format="get(name.basename())" \
-  | egrep -o '[^/]+$')
+  | grep -Eo '[^/]+$')
 # create an identity service account for IAP (only created if it doesn't exist yet)
 gcloud --project "$project_id" beta services identity create \
   --service=iap.googleapis.com \

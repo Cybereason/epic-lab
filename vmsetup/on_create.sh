@@ -3,6 +3,9 @@
 set -u
 set -e
 
+# we export all variables and functions for the benefit of the additional setup scripts, if they exist
+set -o allexport
+
 # validate operating system
 which lsb_release
 lsb_release -a
@@ -263,7 +266,7 @@ END
 }
 
 user_file_exists username || run_as_user <<'END'
-  individual_user=$(echo $HOSTNAME | egrep -o '^[a-zA-Z]+')
+  individual_user=$(echo $HOSTNAME | grep -Eo '^[a-zA-Z]+')
   echo -n "$individual_user" > ~/username
 END
 
@@ -303,6 +306,16 @@ END
       cp -r ~/configuration/$username/jupyterlab-settings/* "${jpl_settings_path}/@jupyterlab/"
     fi
 END
+}
+
+echo 'epic-lab: checking for "additional_on_create.sh"'
+
+test -f "$RUNDIR/additional_on_create.sh" || {
+  fetch_gs_script "additional_on_create.sh" && {
+    echo 'epic-lab: running "additional_on_create.sh"'
+    "$RUNDIR/additional_on_create.sh"
+    echo 'epic-lab: "additional_on_create.sh" done'
+  }
 }
 
 echo 'epic-lab: on-create script done successfully'

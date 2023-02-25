@@ -160,7 +160,7 @@ Usage:
 
   configuration:
     configure the following in '$EPIC_LAB_CONFIG':
-    - SYNCCODE_GCS_BASE_URL: your GCS synccode base url (note: has to be gs://<gcs_scripture_bucket>/synccode)
+    - SYNCCODE_GCS_BASE_URL: your GCS synccode base url (note: has to be gs://<gcs_scripts_bucket>/synccode)
     - SYNCCODE_USERNAME: use the same username you used for cloud VM name prefix (e.g. gooduser)
     - SYNCCODE_LOCAL_CODE_BASE: the path for your local repos parent directory (e.g. ~/code)
     - SYNCCODE_REPOS: a comma-separated list of repo names to upload (e.g. repo1,repo2)

@@ -28,7 +28,7 @@ file_exists() { test -e "$1"; }
 prog_exists() { which "$1" && echo "prog $1 already exists"; }
 line_exists() { grep "$1" "$2"; }
 user_file_exists() { file_exists "$USER_HOME/$1"; }
-service_exists() { systemctl list-unit-files | egrep --silent "\b$1.service\b"; }
+service_exists() { systemctl list-unit-files | grep -E --silent "\b$1.service\b"; }
 pip_installed() { $USER_HOME/conda/pip list | grep --silent "$1=="; }
 source_from_gs() { source <(gsutil cat "$gs_base_path/$1"); }
 run_from_gs() { gsutil cat "$gs_base_path/$1" | bash -; }
