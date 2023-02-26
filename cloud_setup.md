@@ -248,13 +248,13 @@ epic_lab_proxy_ipaddr=$(gcloud --project "$project_id" compute addresses describ
   --format="get(address)" \
   --global)
 
+# These three are prep for IAP, not the load balancer; but setting up a DNS takes time.
 # create a DNS A record
 gcloud --project "$dns_project_id" dns record-sets create "$epic_lab_proxy_domain" \
   --zone="$dns_zone_name" \
   --type="A" \
   --ttl="300" \
   --rrdatas="$epic_lab_proxy_ipaddr"
-
 # create an SSL certificate
 gcloud --project "$project_id" compute ssl-certificates create epic-lab-proxy \
   --description="epic-lab-proxy" \
@@ -328,7 +328,7 @@ gcloud --project "$project_id" compute ssl-certificates describe epic-lab-proxy 
 
 The final step is to assign IAP privileges to any user or group who should be able to access the lab environment.
 * Go here: https://console.cloud.google.com/security/iap
-* Click the "Global HTTP(S) Load Balancer"
+* Click the "epic-lab-proxy" / "Global HTTP(S) Load Balancer" row
 * Click "Add Principal"
 * Enter the user or group principals and grant "Cloud IAP -> IAP-secured Web App User"
 

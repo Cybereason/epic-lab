@@ -96,14 +96,10 @@ This requires users to have the following IAM roles assigned to them:
 * `roles/iap.tunnelResourceAccessor`
 * `roles/compute.instanceAdmin.v1`
 
-The command connects to the instance and starts up at a new user's home directory, so switch to `jupyter` first.
-For example:
+Note that any additional arguments will be passed to `ssh`. So you can use it to e.g. forward a port by running:
 ```shell
-gooduser@laptop:~$ epic-notebook ssh gooduser-20220704
-Welcome to Ubuntu 20.04.5 LTS (GNU/Linux 5.15.0-1029-gcp x86_64)
-gooduser@gooduser-20220704:~$ sudo su - jupyter
-(base) jupyter@gooduser-20220704:~$ 
-``` 
+epic-notebook ssh gooduser-20220704 -L 18080:localhost:8080
+```
 
 ### Synchronizing working code into VMs
 
