@@ -32,4 +32,4 @@ setup:
 
   entry_points:
     console_scripts:
-      - "epic-lab = epic.lab:main"
+      - "epic-lab = epic.lab.main:main"
