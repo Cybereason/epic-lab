@@ -130,6 +130,29 @@ synccode_delete_repo() {
   echo "=== synccode: repo $repo deleted, remember to manually remove any VM downloaded copies ==="
 }
 
+synccode_path() {
+  if [[ -e "$HOME/synccode" ]]; then
+    base="$HOME/synccode"
+    folders=$(find "$base" -mindepth 1 -maxdepth 1 -type d)
+  else
+    _load_config
+    base="$SYNCCODE_LOCAL_CODE_BASE"
+    folders=$(for x in $(tr , ' ' <<< "$SYNCCODE_REPOS"); do test -d "$base/$x" && echo "$base/$x"; done)
+  fi
+  folders=$(
+    for folder in $folders; do
+      if [[ -e "$folder/.synccode_sub_paths" ]]; then
+        while IFS= read -r sub_path; do
+          echo "$folder/$sub_path"
+        done < <(grep -Eo '\S.*' "$folder/.synccode_sub_paths" | grep -Eo '.*\S')
+      else
+        echo "$folder"
+      fi
+    done
+  )
+  tr '\n' ':' <<< "$folders" | sed 's/:$//g'
+}
+
 synccode_configure_vm() {
   bucket="$1"
   prefix="$2"
@@ -156,7 +179,11 @@ Usage:
     delete:
       - epic-synccode delete repo
       - run this on a local dev machine to delete the cloud copy of the repo
-      - after the cloud copy is deleted, you'll need to manually remove any VM downloaded copies
+      - after the cloud copy is deleted, you'll need to manually remove any VM downloaded
+    path:
+      - epic-synccode path
+      - print all synccode paths formatted for PYTHONPATH
+      - usage example: \`PYTHONPATH=\$(epic-synccode path) python -m repo.pkg.module\`
 
   configuration:
     configure the following in '$EPIC_LAB_CONFIG':
@@ -181,6 +208,9 @@ elif [[ "$cmd" == 'download-repo' ]]; then
 elif [[ "$cmd" == 'delete' ]]; then
   shift
   synccode_delete_repo "$@"
+elif [[ "$cmd" == 'path' ]]; then
+  shift
+  synccode_path "$@"
 elif [[ "$cmd" == 'configure-vm' ]]; then
   shift
   synccode_configure_vm "$@"

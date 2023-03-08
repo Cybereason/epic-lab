@@ -128,6 +128,12 @@ epic-synccode delete repo2
 After this command, VM downloaded copies of `repo2` will not be updated further, but are not auto-deleted. Remove these
 copies from e.g. `~/synccode/repo2` manually.
 
+Finally, if you want to load all synccode paths into your python path, you can use the `epic-synccode path` command.
+This is useful for running modules with `python -m`. For example:
+```shell
+PYTHONPATH=$(epic-synccode path) python -m repo.pkg.module
+```
+
 ## Cloud setup guide
 
 The setup process is made up of three parts.
