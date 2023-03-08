@@ -13,6 +13,9 @@ setup:
     - epic
   version_module_paths:
     - epic/lab
+  manifest_extra:
+    - recursive-include epic/lab/scripts *
+    - recursive-include epic/lab/vmsetup *
 
   classifiers:
     - "Development Status :: 4 - Beta"
@@ -26,3 +29,7 @@ setup:
   scripts:
     - epic/lab/scripts/epic-synccode
     - epic/lab/scripts/epic-notebook
+
+  entry_points:
+    console_scripts:
+      - "epic-lab = epic.lab.main:main"

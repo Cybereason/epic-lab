@@ -196,23 +196,18 @@ EOF
 }
 
 cmd="${1:-help}"
+shift || true
 if [[ "$cmd" == 'upload' ]] || [[ "$cmd" == 'up' ]]; then
-  shift
   synccode_upload "$@"
 elif [[ "$cmd" == 'download' ]] || [[ "$cmd" == 'dn' ]]; then
-  shift
   synccode_download "$@"
 elif [[ "$cmd" == 'download-repo' ]]; then
-  shift
   synccode_download_repo "$@"
 elif [[ "$cmd" == 'delete' ]]; then
-  shift
   synccode_delete_repo "$@"
 elif [[ "$cmd" == 'path' ]]; then
-  shift
   synccode_path "$@"
 elif [[ "$cmd" == 'configure-vm' ]]; then
-  shift
   synccode_configure_vm "$@"
 elif [[ "$cmd" == 'help' ]] || [[ "$cmd" == '--help' ]]; then
   usage
