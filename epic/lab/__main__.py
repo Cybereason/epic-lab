@@ -1,3 +1,4 @@
+import subprocess
 from os.path import dirname, join, abspath
 from sys import argv, exit
 
@@ -5,6 +6,14 @@ USAGE = """\
 Usage: python -m epic.lab <command>
 
 Commands:
+    `synccode`:
+        Run the `epic-synccode` sub-command.
+        For more details, run `epic-lab synccode help`.
+    
+    `notebook`:
+        Run the `epic-notebook` sub-command.
+        For more details, run `epic-lab notebook help`.
+
     `vmsetup-path`:
         Print the absolute path to the vmsetup folder.
         Use this when creating a new notebook setup version, with commands such as the following:
@@ -20,8 +29,22 @@ def vmsetup_path():
     print(abspath(join(dirname(__file__), "vmsetup")))
 
 
-if argv[1] == "vmsetup-path":
-    vmsetup_path()
-else:
-    print(USAGE)
-    exit(1)
+def _script_path(name):
+    return join(dirname(__file__), "scripts", name)
+
+
+def main():
+    cmd = argv[1] if argv[1:] else None
+    if cmd == "vmsetup-path":
+        vmsetup_path()
+    elif cmd == "synccode":
+        exit(subprocess.call([_script_path("epic-synccode")] + argv[2:]))
+    if cmd == "notebook":
+        exit(subprocess.call([_script_path("epic-notebook")] + argv[2:]))
+    else:
+        print(USAGE)
+        exit(1)
+
+
+if __name__ == '__main__':
+    main()

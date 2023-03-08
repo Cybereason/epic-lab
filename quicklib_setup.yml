@@ -29,3 +29,7 @@ setup:
   scripts:
     - epic/lab/scripts/epic-synccode
     - epic/lab/scripts/epic-notebook
+
+  entry_points:
+    console_scripts:
+      - "epic-lab = epic.lab:main"
