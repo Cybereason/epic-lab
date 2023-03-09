@@ -124,7 +124,7 @@ synccode_delete_repo() {
   _load_config
   repo="$1"
   echo "=== synccode: deleting ${SYNCCODE_USERNAME}'s repo $repo ==="
-  gsutil -m rm "${SYNCCODE_GCS_BASE_URL}/${SYNCCODE_USERNAME}/${repo}" \
+  gsutil -m rm -r "${SYNCCODE_GCS_BASE_URL}/${SYNCCODE_USERNAME}/${repo}" \
     2>&1 \
   | grep -v issue33725
   echo "=== synccode: repo $repo deleted, remember to manually remove any VM downloaded copies ==="
