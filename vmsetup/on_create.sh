@@ -91,7 +91,7 @@ EOT
 END
 
 prog_exists node || {
-  curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
   apt-get install -y nodejs
   echo "node version: $(node -v)"
 }
@@ -171,14 +171,14 @@ user_file_exists conda/bin/jupyter || run_as_user <<END
     epic-lab
 END
 
-user_file_exists .jupyter/jupyter_notebook_config.py || run_as_user <<END
-  echo "setting up jupyter-notebook"
-  $USER_HOME/conda/bin/jupyter notebook --generate-config
+user_file_exists .jupyter/jupyter_lab_config.py || run_as_user <<END
+  echo "setting up jupyter-lab"
+  $USER_HOME/conda/bin/jupyter lab --generate-config
 
-  cat << EOT >> ~/.jupyter/jupyter_notebook_config.py
-c.NotebookApp.ip = '0.0.0.0'
-c.NotebookApp.port = 8080
-c.NotebookApp.open_browser = False
+  cat << EOT >> ~/.jupyter/jupyter_lab_config.py
+c.ServerApp.ip = '0.0.0.0'
+c.ServerApp.port = 8080
+c.ServerApp.open_browser = False
 c.LabApp.base_url = '$instance_name'
 EOT
 END
