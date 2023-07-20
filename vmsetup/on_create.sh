@@ -138,7 +138,8 @@ user_file_exists conda/bin/jupyter || run_as_user <<END
 
   echo "install extension @jupyterlab/git and deps"
   $USER_HOME/conda/bin/pip install jupyterlab-git
-  $USER_HOME/conda/bin/jupyter labextension install @jupyterlab/git
+  # # In jupyterlab v4, it's not clear that this is needed, but it definitely breaks
+  # $USER_HOME/conda/bin/jupyter labextension install @jupyterlab/git
 
   # additional packages (some with pinned versions)
   $USER_HOME/conda/bin/conda install -y \
