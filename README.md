@@ -147,3 +147,30 @@ The three parts are:
 3. setting up secure access from the Internet to the reverse proxy based on GCP authentication and access management
 
 Follow the full guide in [cloud_setup.md](cloud_setup.md) to create your lab today.
+
+
+## Troubleshooting notebook launch
+
+Stuff happens. Dependencies update, new versions are released, domains change their place.
+If the script that sets up the new machine fails, you'll end up with an unusable instance.
+
+If you suspect that happened, review the instance's log using the `epic-notebook log` command. For example: 
+```shell
+epic-notebook log gooduser-20220704
+```
+
+If you see the text `startup-script exit status 1` it means the setup process failed.
+
+While full troubleshooting is beyond the scope of this document, the following approach is suggested:
+1. Log into the machine using e.g. `epic-notebook ssh gooduser-20220704`
+2. Switch to `root` using e.g. `sudo su -`
+3. Re-run the setup script manually using the following two commands (adjust based on your `~/.epic/lab` configuration):
+    ```shell
+    export gs_base_path=gs://<your_epic_lab_bucket>/<vm_setup_version>
+    gsutil cat $gs_base_path/on_create.sh | -
+    ```
+4. Please be aware that while the script as a whole is idempotent, and would skip fully-completed steps, it would not 
+resume some steps that were interrupted before full completion. Such steps might be incorrectly skipped. To recover from
+such a state, you'd need to manually execute the remaining step commands, and then re-run the setup script to proceed
+with the usual setup process.
+5. If applicable, consider re-deploying the `vmsetup` scripts so that any fixes are applied to future notebook launches.
