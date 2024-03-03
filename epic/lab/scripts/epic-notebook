@@ -110,6 +110,16 @@ notebook_logs() {
       "$@"
 }
 
+notebook_logs_f() {
+  start="start=0"
+  while true; do
+    out=$(notebook_logs "$@" "--$start" 2>&1)
+    start=$(tail -1 <<< "$out" | grep -Eo 'start=\d+')
+    echo "$out"
+    sleep 2
+  done
+}
+
 usage() {
   cat <<-EOF
 Usage:
@@ -131,6 +141,8 @@ Usage:
     logs:
       - epic-notebook logs <instance_name> [--start=...]
       - get serial port 1 (AKA console) output
+    logs_f:
+      - similar to logs, but iteratively polls for new logs (think tail -f)
     ssh:
       - epic-notebook ssh <instance_name> [-- <ssh-flags>]
       - use IAP to ssh into the instance directly while bypassing network configuration

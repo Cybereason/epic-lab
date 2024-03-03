@@ -39,10 +39,17 @@ ssh-keygen -f "$ssh_key_name"
 
 # TODO: create a notebook password hash file using some variation of jupyter notebook password.
 # take care though because just running `jupyter notebook password` overrides your local notebook configuration.
+# this tool could be useful: https://github.com/dddlab/jupyter-passwd
+# or this, much simpler and uses notebook: https://stackoverflow.com/a/66065430/221917
+# which can be run like:
+#   python -c 'from notebook.auth import passwd; from getpass import getpass; print(passwd(passphrase=getpass(), algorithm="sha256"))'
+# either way, the file's contents should look something like:
+#   { "NotebookApp": { "password": "<the hashed password>" } }
 jupyter_password_hash_file="jupyter_password_hash.json"
 
 # enable services
 # note: this change sometimes takes a few minutes to propagate
+# note: enabling compute can sometimes fail on "permission denied"; if it does, try enabling it through the web console.
 gcloud --project "$project_id" services enable compute.googleapis.com
 gcloud --project "$project_id" services enable secretmanager.googleapis.com
 gcloud --project "$project_id" services enable sourcerepo.googleapis.com
@@ -123,6 +130,9 @@ This can be done now on any local machine and for any user, as long as they have
 
 For the sake of example, we'll continue to launch for the same user we've run from until now.
 
+Please note: before any VM can be created, a default network and subnet would need to be created on your zone of choice.
+Use 'default' for the VPC name and the subnet name. This is not currently documented in this guide.
+
 ```shell
 # launch your first machine
 # note: if you didn't `pip install` the epic-lab library, you can still run the scripts directly from 'epic/lab/scripts'
@@ -151,7 +161,7 @@ Use the commands below to build and deploy a proxy container into the Cloud Run 
 Run these commands in continuation to those of the previous section:
 
 ```shell
-# configuration: these defaults should usually work out of the box
+# configuration: these defaults should usually work out of the box, but make sure they're correct for your default VPC.
 vpc_network_name=default
 available_ip_range_28="10.8.0.0/28"
 
@@ -173,7 +183,9 @@ gcloud --project "$project_id" compute networks vpc-access connectors describe e
   | grep 'state: READY'
 
 # create cloudbuild.yaml
-# note: if you want to provide PUBLIC_BASE_URL as well, add another build arg. see proxy/README.md for details.
+# note: if you want to provide PUBLIC_BASE_URL as well, add another build arg, such as:
+#   '--build-arg', 'PUBLIC_BASE_URL=https://example.com',
+# see proxy/README.md for more details.
 echo "
 steps:
 - name: 'gcr.io/cloud-builders/docker'
@@ -333,6 +345,15 @@ The final step is to assign IAP privileges to any user or group who should be ab
 * Enter the user or group principals and grant "Cloud IAP -> IAP-secured Web App User"
 
 Please note that it takes several minutes before the privilege is propagated.
+
+# Add access for SSH over IAP
+
+To allow ssh access over IAP, a firewall rule needs to be added, such as:
+- `allow-ssh-ingress-from-iap`
+- `ingress`
+- all instances of the network
+- source IPs: `35.235.240.0/20` (this is a GCP range used for ALL IAP everywhere, just use it)
+- TCP port 22
 
 # 🧑‍🔬 Rejoice and go do lab things! 🔬
 
